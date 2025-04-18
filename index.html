@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Creditor Management</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <style>
+        :root {
+            --bg-start: #e6f0fa;
+            --bg-end: #ffffff;
+            --text: #333;
+            --container-bg: #ffffff;
+            --header-bg: #1a3c6d;
+            --header-text: #ffffff;
+            --button-bg: #28a745;
+            --button-hover: #218838;
+            --button-disabled: #cccccc;
+            --table-header-bg: linear-gradient(45deg, #1a3c6d, #3b5998);
+            --table-row1: #d1e7dd;
+            --table-row2: #cce5ff;
+            --table-hover: #b3d4fc;
+            --balance-positive: #2ecc71;
+            --balance-negative: #e57373;
+            --border: #e0e0e0;
+            --shadow: rgba(0, 0, 0, 0.1);
+            --dropdown-bg: #ffffff;
+            --dropdown-text: #333;
+        }
+
+        [data-theme="dark"] {
+            --bg-start: #1e2a44;
+            --bg-end: #2a3b5e;
+            --text: #ffffff;
+            --container-bg: #2e3b55;
+            --header-bg: #3b5998;
+            --header-text: #ffffff;
+            --button-bg: #2ecc71;
+            --button-hover: #27ae60;
+            --button-disabled: #666;
+            --table-header-bg: linear-gradient(45deg, #4b5e9e, #6b7280);
+            --table-row1: #6b7280;
+            --table-row2: #7c3aed;
+            --table-hover: #9ca3af;
+            --balance-positive: #34d399;
+            --balance-negative: #f87171;
+            --border: #444;
+            --shadow: rgba(0, 0, 0, 0.3);
+            --dropdown-bg: #2e3b55;
+            --dropdown-text: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 30px;
+            background: linear-gradient(to bottom, var(--bg-start), var(--bg-end));
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .settings-icon {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            cursor: pointer;
+            font-size: 24px;
+            color: var(--header-text);
+            background: var(--header-bg);
+            padding: 8px 12px;
+            border-radius: 5px;
+            z-index: 1000;
+        }
+
+        .settings-icon:hover {
+            background: var(--button-hover);
+        }
+
+        .dropdown-menu {
+            position: fixed;
+            top: 60px;
+            right: 20px;
+            background: var(--dropdown-bg);
+            color: var(--dropdown-text);
+            border-radius: 5px;
+            box-shadow: 0 4px 12px var(--shadow);
+            display: none;
+            z-index: 999;
+        }
+
+        .dropdown-menu a {
+            display: block;
+            padding: 10px 20px;
+            color: var(--dropdown-text);
+            text-decoration: none;
+            font-size: 1em;
+        }
+
+        .dropdown-menu a:hover {
+            background: var(--table-hover);
+            border-radius: 5px;
+        }
+
+        h1, h3 {
+            text-align: center;
+            color: var(--header-bg);
+            margin-bottom: 20px;
+            text-shadow: 1px 1px 2px var(--shadow);
+        }
+
+        h1 {
+            font-size: 2.2em;
+        }
+
+        h3#transactionHeader {
+            font-size: 1.4em;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-weight: normal;
+        }
+
+        .creditor-container, .profile-container, .auth-container {
+            background: var(--container-bg);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px var(--shadow);
+            margin-bottom: 30px;
+        }
+
+        .creditor-container select, .profile-container select, .auth-container select {
+            width: calc(33% - 20px);
+            padding: 10px;
+            margin: 8px 5px;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            font-size: 1em;
+            background: var(--container-bg);
+            color: var(--text);
+        }
+
+        .creditor-container input[type="text"], .profile-container input[type="text"], .auth-container input[type="text"], .auth-container input[type="password"] {
+            width: calc(33% - 30px);
+            padding: 10px;
+            margin: 8px 5px;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            font-size: 1em;
+            background: var(--container-bg);
+            color: var(--text);
+        }
+
+        .creditor-container input[type="number"] {
+            width: calc(20% - 20px);
+            padding: 10px;
+            margin: 8px 5px;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            font-size: 1em;
+            background: var(--container-bg);
+            color: var(--text);
+        }
+
+        .creditor-container button, .profile-container button, .auth-container button {
+            padding: 10px 20px;
+            background: var(--button-bg);
+            color: var(--header-text);
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+            font-size: 1em;
+            margin: 8px 5px;
+        }
+
+        .creditor-container button:hover, .profile-container button:hover, .auth-container button:hover {
+            background: var(--button-hover);
+        }
+
+        .creditor-container button:disabled, .profile-container button:disabled, .auth-container button:disabled {
+            background: var(--button-disabled);
+            cursor: not-allowed;
+        }
+
+        .totals {
+            background: var(--container-bg);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px var(--shadow);
+            margin-bottom: 20px;
+            font-size: 1.1em;
+            font-weight: bold;
+            color: var(--header-bg);
+            text-align: left;
+        }
+
+        .totals p {
+            margin: 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--container-bg);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px var(--shadow);
+            margin-bottom: 30px;
+        }
+
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: var(--table-header-bg);
+            color: var(--header-text);
+            font-weight: 600;
+        }
+
+        tr:nth-child(odd) {
+            background: var(--table-row1);
+        }
+
+        tr:nth-child(even) {
+            background: var(--table-row2);
+        }
+
+        tr:hover {
+            background: var(--table-hover);
+        }
+
+        td {
+            color: var(--text);
+        }
+
+        td.balance-positive {
+            color: var(--balance-positive);
+            font-weight: bold;
+        }
+
+        td.balance-negative {
+            color: var(--balance-negative);
+            font-weight: bold;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 20px;
+            color: var(--text);
+        }
+
+        .statement-container {
+            margin-top: 20px;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="settings-icon" onclick="toggleDropdown()">☰</div>
+    <div class="dropdown-menu" id="dropdownMenu">
+        <a href="#" onclick="goHome()">Home</a>
+        <a href="#" onclick="showProfile()">Profile</a>
+        <a href="#" onclick="setTheme('light')">Light Theme</a>
+        <a href="#" onclick="setTheme('dark')">Dark Theme</a>
+        <a href="#" onclick="showSignIn()" id="signInLink">Sign In</a>
+        <a href="#" onclick="showSignUp()" id="signUpLink">Sign Up</a>
+        <a href="#" onclick="signOut()" id="signOutLink" class="hidden">Sign Out</a>
+    </div>
+
+    <div class="creditor-container" id="creditorContainer">
+        <h1>Creditor Management</h1>
+        <div class="form-container">
+            <h3 id="transactionHeader">Add Transaction or New Creditor</h3>
+            <select id="creditorSelect" onchange="toggleNewCreditorInput()">
+                <option value="" selected>Select Creditor</option>
+                <option value="new">Add New Creditor</option>
+            </select>
+            <input type="text" id="newCreditorName" placeholder="New Creditor Name" style="display: none;">
+            <select id="transactionType">
+                <option value="credit">Credit</option>
+                <option value="debit">Debit</option>
+            </select>
+            <input type="number" id="amount" placeholder="Amount" step="0.01" min="0" required>
+            <button onclick="addTransaction()">Submit</button>
+            <button onclick="addNewCreditor()">New</button>
+        </div>
+
+        <div class="totals">
+            <p>Total Balance: R<span id="totalBalance">0.00</span></p>
+        </div>
+
+        <table id="creditorTable">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Balance (R)</th>
+                </tr>
+            </thead>
+            <tbody id="creditorBody"></tbody>
+        </table>
+
+        <div class="statement-container">
+            <h3>View Statement</h3>
+            <select id="statementSelect" onchange="renderStatement()">
+                <option value="" selected>Select Creditor for Statement</option>
+            </select>
+            <button id="downloadPdf" onclick="downloadStatementAsPDF()" disabled>Download as PDF</button>
+            <table id="statementTable" class="hidden">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Amount (R)</th>
+                        <th>Balance (R)</th>
+                    </tr>
+                </thead>
+                <tbody id="statementBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="profile-container hidden" id="profileContainer">
+        <h1>Profile</h1>
+        <h3>Manage Your Profile</h3>
+        <div class="form-container">
+            <input type="text" id="profileName" placeholder="Enter your name">
+            <button onclick="saveProfile()">Save</button>
+        </div>
+    </div>
+
+    <div class="auth-container hidden" id="signInContainer">
+        <h1>Sign In</h1>
+        <h3>Enter Your Credentials</h3>
+        <div class="form-container">
+            <input type="text" id="signInUsername" placeholder="Username">
+            <input type="password" id="signInPassword" placeholder="Password">
+            <button onclick="signIn()">Sign In</button>
+        </div>
+    </div>
+
+    <div class="auth-container hidden" id="signUpContainer">
+        <h1>Sign Up</h1>
+        <h3>Create a New Account</h3>
+        <div class="form-container">
+            <input type="text" id="signUpUsername" placeholder="Username">
+            <input type="password" id="signUpPassword" placeholder="Password">
+            <button onclick="signUp()">Sign Up</button>
+            <button onclick="googleSignUp()">Sign Up with Google</button>
+        </div>
+    </div>
+
+    <script>
+        // Backend URL (update to your deployed server)
+        const BACKEND_URL = 'http://localhost:3000'; // Change to your hosted URL
+
+        // Initial creditor list
+        const initialCreditors = [
+            { name: "BuildMax", credit: 0, debit: 0 },
+            { name: "BuildMart", credit: 0, debit: 0 },
+            { name: "Eureka", credit: 0, debit: 0 },
+            { name: "Inco", credit: 0, debit: 0 },
+            { name: "Matus", credit: 0, debit: 0 },
+            { name: "Arf", credit: 0, debit: 0 },
+            { name: "Newden", credit: 0, debit: 0 },
+            { name: "Medal", credit: 0, debit: 0 },
+            { name: "Hendok", credit: 0, debit: 0 },
+            { name: "MatelMan", credit: 0, debit: 0 },
+            { name: "Buildit", credit: 0, debit: 0 },
+            { name: "Wrd Distributors", credit: 0, debit: 0 },
+            { name: "Herman Van De Pole", credit: 0, debit: 0 },
+            { name: "SwissBuild", credit: 0, debit: 0 },
+            { name: "Pulse", credit: 0, debit: 0 }
+        ];
+
+        // App state
+        let currentUser = null;
+        let creditors = initialCreditors;
+        let transactions = [];
+        let profile = { name: '' };
+        let theme = 'light';
+
+        // Google Sign-In initialization
+        function initGoogleSignIn() {
+            google.accounts.id.initialize({
+                client_id: 'YOUR_GOOGLE_CLIENT_ID', // Replace with your Google Client ID
+                callback: handleGoogleSignIn
+            });
+        }
+
+        // Hash password using SHA-256
+        async function hashPassword(password) {
+            const msgBuffer = new TextEncoder().encode(password);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        // Save user data to backend
+        async function saveCurrentUserData() {
+            if (!currentUser) return;
+            try {
+                await fetch(`${BACKEND_URL}/save`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': currentUser },
+                    body: JSON.stringify({ username: currentUser, data: { creditors, transactions, profile, theme } })
+                });
+            } catch (e) {
+                console.error('Save failed:', e);
+                alert('Failed to save data. Using local storage.');
+                localStorage.setItem('guestData', JSON.stringify({ creditors, transactions, profile, theme }));
+            }
+        }
+
+        // Load user data from backend
+        async function loadUserData(username) {
+            try {
+                const response = await fetch(`${BACKEND_URL}/data?username=${encodeURIComponent(username)}`);
+                if (response.ok) {
+                    const user = await response.json();
+                    creditors = user.data.creditors || initialCreditors;
+                    transactions = user.data.transactions || [];
+                    profile = user.data.profile || { name: '' };
+                    theme = user.data.theme || 'light';
+                    document.documentElement.setAttribute('data-theme', theme);
+                    document.getElementById('transactionHeader').textContent = profile.name || "Add Transaction or New Creditor";
+                    document.getElementById('profileName').value = profile.name;
+                    populateCreditorDropdown();
+                    populateStatementDropdown();
+                    renderTable();
+                } else {
+                    throw new Error('User not found');
+                }
+            } catch (e) {
+                console.error('Load failed:', e);
+                alert('Failed to load data. Starting fresh.');
+                creditors = initialCreditors;
+                transactions = [];
+                profile = { name: '' };
+                theme = 'light';
+            }
+        }
+
+        // Load guest state (local)
+        function loadGuestState() {
+            const guestData = JSON.parse(localStorage.getItem('guestData')) || {
+                creditors: initialCreditors,
+                transactions: [],
+                profile: { name: '' },
+                theme: 'light'
+            };
+            creditors = guestData.creditors;
+            transactions = guestData.transactions;
+            profile = guestData.profile;
+            theme = guestData.theme;
+            document.documentElement.setAttribute('data-theme', theme);
+            document.getElementById('transactionHeader').textContent = profile.name || "Add Transaction or New Creditor";
+            document.getElementById('profileName').value = profile.name;
+            populateCreditorDropdown();
+            populateStatementDropdown();
+            renderTable();
+        }
+
+        // Update dropdown
+        function updateDropdown() {
+            const signInLink = document.getElementById('signInLink');
+            const signUpLink = document.getElementById('signUpLink');
+            const signOutLink = document.getElementById('signOutLink');
+            if (currentUser) {
+                signInLink.classList.add('hidden');
+                signUpLink.classList.add('hidden');
+                signOutLink.classList.remove('hidden');
+            } else {
+                signInLink.classList.remove('hidden');
+                signUpLink.classList.remove('hidden');
+                signOutLink.classList.add('hidden');
+            }
+        }
+
+        // Show Sign In
+        function showSignIn() {
+            document.getElementById('creditorContainer').classList.add('hidden');
+            document.getElementById('profileContainer').classList.add('hidden');
+            document.getElementById('signInContainer').classList.remove('hidden');
+            document.getElementById('signUpContainer').classList.add('hidden');
+            document.getElementById('signInUsername').value = '';
+            document.getElementById('signInPassword').value = '';
+            toggleDropdown();
+        }
+
+        // Show Sign Up
+        function showSignUp() {
+            document.getElementById('creditorContainer').classList.add('hidden');
+            document.getElementById('profileContainer').classList.add('hidden');
+            document.getElementById('signInContainer').classList.add('hidden');
+            document.getElementById('signUpContainer').classList.remove('hidden');
+            document.getElementById('signUpUsername').value = '';
+            document.getElementById('signUpPassword').value = '';
+            toggleDropdown();
+        }
+
+        // Manual Sign In
+        async function signIn() {
+            const username = document.getElementById('signInUsername').value.trim();
+            const password = document.getElementById('signInPassword').value;
+            if (!username || !password) {
+                alert("Please enter both username and password.");
+                return;
+            }
+            const hashedPassword = await hashPassword(password);
+            try {
+                const response = await fetch(`${BACKEND_URL}/signin`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password: hashedPassword })
+                });
+                if (response.ok) {
+                    currentUser = username;
+                    sessionStorage.setItem('currentUser', currentUser);
+                    await loadUserData(username);
+                    alert(`Welcome, ${username}!`);
+                    goHome();
+                } else {
+                    alert("Invalid username or password.");
+                }
+            } catch (e) {
+                console.error('Sign in failed:', e);
+                alert('Sign in failed. Check connection.');
+            }
+        }
+
+        // Manual Sign Up
+        async function signUp() {
+            const username = document.getElementById('signUpUsername').value.trim();
+            const password = document.getElementById('signUpPassword').value;
+            if (!username || !password) {
+                alert("Please enter both username and password.");
+                return;
+            }
+            const hashedPassword = await hashPassword(password);
+            try {
+                const response = await fetch(`${BACKEND_URL}/signup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username,
+                        passwordHash: hashedPassword,
+                        data: { creditors: initialCreditors, transactions: [], profile: { name: '' }, theme: 'light' }
+                    })
+                });
+                if (response.ok) {
+                    alert("Account created! Please sign in.");
+                    showSignIn();
+                } else {
+                    alert("Username already exists.");
+                }
+            } catch (e) {
+                console.error('Sign up failed:', e);
+                alert('Sign up failed. Check connection.');
+            }
+        }
+
+        // Google Sign Up
+        function googleSignUp() {
+            google.accounts.id.prompt();
+        }
+
+        // Handle Google Sign-In
+        async function handleGoogleSignIn(response) {
+            const credential = response.credential;
+            try {
+                const googleResponse = await fetch(`${BACKEND_URL}/googlesignin`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: credential })
+                });
+                if (googleResponse.ok) {
+                    const user = await googleResponse.json();
+                    currentUser = user.username;
+                    sessionStorage.setItem('currentUser', currentUser);
+                    await loadUserData(currentUser);
+                    alert(`Welcome, ${user.data.profile.name || currentUser}!`);
+                    goHome();
+                } else {
+                    alert("Google Sign-In failed.");
+                }
+            } catch (e) {
+                console.error('Google Sign-In failed:', e);
+                alert('Google Sign-In failed. Check connection.');
+            }
+        }
+
+        // Sign Out
+        async function signOut() {
+            await saveCurrentUserData();
+            currentUser = null;
+            sessionStorage.removeItem('currentUser');
+            loadGuestState();
+            alert("Signed out.");
+            goHome();
+        }
+
+        // Save creditors
+        async function saveCreditors() {
+            await saveCurrentUserData();
+        }
+
+        // Save transactions
+        async function saveTransactions() {
+            await saveCurrentUserData();
+        }
+
+        // Save profile
+        async function saveProfile() {
+            const name = document.getElementById('profileName').value.trim();
+            profile.name = name;
+            await saveCurrentUserData();
+            alert("Profile saved!");
+            goHome();
+        }
+
+        // Toggle dropdown
+        function toggleDropdown() {
+            const dropdown = document.getElementById('dropdownMenu');
+            dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+        }
+
+        // Close dropdown
+        document.addEventListener('click', function(event) {
+            const dropdown = document.getElementById('dropdownMenu');
+            const icon = document.querySelector('.settings-icon');
+            if (!dropdown.contains(event.target) && !icon.contains(event.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+
+        // Home
+        function goHome() {
+            document.getElementById('creditorContainer').classList.remove('hidden');
+            document.getElementById('profileContainer').classList.add('hidden');
+            document.getElementById('signInContainer').classList.add('hidden');
+            document.getElementById('signUpContainer').classList.add('hidden');
+            document.getElementById('creditorSelect').value = '';
+            document.getElementById('newCreditorName').value = '';
+            document.getElementById('amount').value = '';
+            document.getElementById('newCreditorName').style.display = 'none';
+            document.getElementById('statementSelect').value = '';
+            document.getElementById('downloadPdf').disabled = true;
+            document.getElementById('statementTable').classList.add('hidden');
+            document.getElementById('transactionHeader').textContent = profile.name || "Add Transaction or New Creditor";
+            populateCreditorDropdown();
+            populateStatementDropdown();
+            renderTable();
+            toggleDropdown();
+        }
+
+        // Show profile
+        function showProfile() {
+            document.getElementById('creditorContainer').classList.add('hidden');
+            document.getElementById('profileContainer').classList.remove('hidden');
+            document.getElementById('signInContainer').classList.add('hidden');
+            document.getElementById('signUpContainer').classList.add('hidden');
+            document.getElementById('profileName').value = profile.name;
+            toggleDropdown();
+        }
+
+        // Set theme
+        async function setTheme(newTheme) {
+            theme = newTheme;
+            document.documentElement.setAttribute('data-theme', theme);
+            await saveCurrentUserData();
+            toggleDropdown();
+        }
+
+        // Populate creditor dropdown
+        function populateCreditorDropdown() {
+            const select = document.getElementById('creditorSelect');
+            select.innerHTML = '<option value="" selected>Select Creditor</option><option value="new">Add New Creditor</option>';
+            creditors.forEach(creditor => {
+                const option = document.createElement('option');
+                option.value = creditor.name;
+                option.textContent = creditor.name;
+                select.appendChild(option);
+            });
+        }
+
+        // Populate statement dropdown
+        function populateStatementDropdown() {
+            const select = document.getElementById('statementSelect');
+            select.innerHTML = '<option value="" selected>Select Creditor for Statement</option>';
+            creditors.forEach(creditor => {
+                const option = document.createElement('option');
+                option.value = creditor.name;
+                option.textContent = creditor.name;
+                select.appendChild(option);
+            });
+        }
+
+        // Toggle new creditor input
+        function toggleNewCreditorInput() {
+            const select = document.getElementById('creditorSelect');
+            const newCreditorInput = document.getElementById('newCreditorName');
+            newCreditorInput.style.display = select.value === 'new' ? 'inline-block' : 'none';
+        }
+
+        // Add new creditor
+        async function addNewCreditor() {
+            const select = document.getElementById('creditorSelect').value;
+            const newCreditorName = document.getElementById('newCreditorName').value.trim();
+
+            if (select !== 'new') {
+                alert("Please select 'Add New Creditor' to add a new creditor.");
+                return;
+            }
+
+            if (newCreditorName === "") {
+                alert("Please enter a new creditor name.");
+                return;
+            }
+
+            if (creditors.some(c => c.name.toLowerCase() === newCreditorName.toLowerCase())) {
+                alert("Creditor name already exists.");
+                return;
+            }
+
+            creditors.push({ name: newCreditorName, credit: 0, debit: 0 });
+            await saveCreditors();
+            populateCreditorDropdown();
+            populateStatementDropdown();
+            renderTable();
+            document.getElementById('newCreditorName').value = '';
+            document.getElementById('creditorSelect').value = '';
+            document.getElementById('newCreditorName').style.display = 'none';
+            alert(`Creditor "${newCreditorName}" added successfully.`);
+        }
+
+        // Add transaction
+        async function addTransaction() {
+            const select = document.getElementById('creditorSelect').value;
+            const newCreditorName = document.getElementById('newCreditorName').value.trim();
+            const transactionType = document.getElementById('transactionType').value;
+            const amount = parseFloat(document.getElementById('amount').value) || 0;
+
+            if (select === "" && newCreditorName === "") {
+                alert("Please select a creditor or enter a new creditor name.");
+                return;
+            }
+
+            if (amount <= 0) {
+                alert("Please enter a valid amount greater than 0.");
+                return;
+            }
+
+            if (select === 'new') {
+                if (newCreditorName === "") {
+                    alert("Please enter a new creditor name.");
+                    return;
+                }
+                if (creditors.some(c => c.name.toLowerCase() === newCreditorName.toLowerCase())) {
+                    alert("Creditor name already exists.");
+                    return;
+                }
+                creditors.push({ name: newCreditorName, credit: 0, debit: 0 });
+            }
+
+            const creditorName = select === 'new' ? newCreditorName : select;
+            const creditor = creditors.find(c => c.name === creditorName);
+            const date = new Date().toISOString();
+
+            if (transactionType === 'credit') {
+                creditor.credit += amount;
+                transactions.push({
+                    creditor: creditorName,
+                    type: 'Credit',
+                    amount: amount,
+                    date: date,
+                    offset: null
+                });
+            } else {
+                const amountToDeduct = Math.min(amount, creditor.credit);
+                creditor.credit -= amountToDeduct;
+                const remainingDebit = amount - amountToDeduct;
+                if (remainingDebit > 0) {
+                    creditor.debit += remainingDebit;
+                }
+                transactions.push({
+                    creditor: creditorName,
+                    type: 'Debit',
+                    amount: amount,
+                    date: date,
+                    offset: amountToDeduct > 0 ? `Offset R${amountToDeduct.toFixed(2)} of Credit` : null
+                });
+            }
+
+            await saveCreditors();
+            await saveTransactions();
+            document.getElementById('transactionHeader').textContent = profile.name || "Add Transaction or New Creditor";
+            populateCreditorDropdown();
+            populateStatementDropdown();
+            renderTable();
+            renderStatement();
+            document.getElementById('creditorSelect').value = '';
+            document.getElementById('newCreditorName').value = '';
+            document.getElementById('amount').value = '';
+            document.getElementById('newCreditorName').style.display = 'none';
+        }
+
+        // Render creditor table
+        function renderTable() {
+            const tbody = document.getElementById('creditorBody');
+            tbody.innerHTML = '';
+
+            let totalBalance = 0;
+            const activeCreditors = creditors.filter(creditor => creditor.credit - creditor.debit !== 0);
+
+            if (activeCreditors.length === 0) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td colspan="2" class="no-data">No creditors with balance</td>`;
+                tbody.appendChild(row);
+            } else {
+                activeCreditors.forEach(creditor => {
+                    const balance = creditor.credit - creditor.debit;
+                    totalBalance += balance;
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${creditor.name}</td>
+                        <td class="${balance >= 0 ? 'balance-positive' : 'balance-negative'}">${balance.toFixed(2)}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+
+            document.getElementById('totalBalance').textContent = totalBalance.toFixed(2);
+        }
+
+        // Render statement
+        function renderStatement() {
+            const select = document.getElementById('statementSelect').value;
+            const tbody = document.getElementById('statementBody');
+            const table = document.getElementById('statementTable');
+            const downloadButton = document.getElementById('downloadPdf');
+            tbody.innerHTML = '';
+
+            if (!select) {
+                table.classList.add('hidden');
+                downloadButton.disabled = true;
+                return;
+            }
+
+            table.classList.remove('hidden');
+            const creditorTransactions = transactions.filter(t => t.creditor === select);
+            downloadButton.disabled = creditorTransactions.length === 0;
+
+            let runningBalance = 0;
+
+            creditorTransactions.forEach(tx => {
+                if (tx.type === 'Credit') {
+                    runningBalance += tx.amount;
+                } else {
+                    const offsetAmount = tx.offset ? parseFloat(tx.offset.match(/R([\d.]+)/)?.[1] || 0) : 0;
+                    runningBalance -= offsetAmount;
+                    const remainingDebit = tx.amount - offsetAmount;
+                    if (remainingDebit > 0) {
+                        runningBalance -= remainingDebit;
+                    }
+                }
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${new Date(tx.date).toLocaleDateString('en-CA')}</td>
+                    <td>${tx.type}</td>
+                    <td>${tx.amount.toFixed(2)}</td>
+                    <td>${runningBalance.toFixed(2)}</td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            if (creditorTransactions.length === 0) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td colspan="4">No transactions found.</td>`;
+                tbody.appendChild(row);
+            }
+        }
+
+        // Download PDF
+        function downloadStatementAsPDF() {
+            const creditorName = document.getElementById('statementSelect').value;
+            if (!creditorName) {
+                alert("Please select a creditor to download the statement.");
+                return;
+            }
+
+            const creditorTransactions = transactions.filter(t => t.creditor === creditorName);
+            if (creditorTransactions.length === 0) {
+                alert("No transactions found for this creditor.");
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            let y = 20;
+
+            doc.setFontSize(16);
+            doc.text(`Statement for ${creditorName}`, 20, y);
+            y += 10;
+
+            doc.setFontSize(12);
+            doc.text("Date", 20, y);
+            doc.text("Type", 60, y);
+            doc.text("Amount (R)", 100, y, { align: "right" });
+            doc.text("Balance (R)", 140, y, { align: "right" });
+            y += 5;
+            doc.line(20, y, 190, y);
+            y += 5;
+
+            let runningBalance = 0;
+            creditorTransactions.forEach(tx => {
+                if (tx.type === 'Credit') {
+                    runningBalance += tx.amount;
+                } else {
+                    const offsetAmount = tx.offset ? parseFloat(tx.offset.match(/R([\d.]+)/)?.[1] || 0) : 0;
+                    runningBalance -= offsetAmount;
+                    const remainingDebit = tx.amount - offsetAmount;
+                    if (remainingDebit > 0) {
+                        runningBalance -= remainingDebit;
+                    }
+                }
+
+                doc.text(new Date(tx.date).toLocaleDateString('en-CA'), 20, y);
+                doc.text(tx.type, 60, y);
+                doc.text(tx.amount.toFixed(2), 100, y, { align: "right" });
+                doc.text(runningBalance.toFixed(2), 140, y, { align: "right" });
+                y += 10;
+            });
+
+            const date = new Date().toISOString().split('T')[0];
+            doc.save(`Statement_${creditorName}_${date}.pdf`);
+        }
+
+        // Initial setup
+        currentUser = sessionStorage.getItem('currentUser');
+        if (currentUser) {
+            loadUserData(currentUser);
+        } else {
+            loadGuestState();
+        }
+        initGoogleSignIn();
+    </script>
+</body>
+</html>
